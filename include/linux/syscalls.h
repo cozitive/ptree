@@ -1297,4 +1297,4 @@ static inline unsigned int ksys_personality(unsigned int personality)
 
 #endif
 
-asmlinkage long sys_ptree(struct pinfo *buf, size_t len);
+asmlinkage long sys_ptree(struct pinfo __user *buf, size_t len);

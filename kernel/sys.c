@@ -73,8 +73,6 @@
 
 #include "uid16.h"
 
-#include <linux/kernel.h>
-
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -2642,9 +2640,73 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 }
 #endif /* CONFIG_COMPAT */
 
-
-SYSCALL_DEFINE2(ptree, struct pinfo *, buf, size_t, len)
+/// @brief traverse the process familiy tree in pre-order from the root and return the information of the processes running on the system
+/// @param[out] buf user-space buffer for pinfos
+/// @param[in] len length of the buffer, i.e., the number of the allocated pinfo entries in the buffer
+/// @return number of pinfos in buf
+SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 {
-	printk(KERN_INFO "Hello, world!");
-	return 255;
+	// If buf is NULL or if len is 0, return -EINVAL.
+	if (buf == NULL || len == 0)
+		return -EINVAL;
+
+	// If buf is outside the accessible address space, return -EFAULT.
+	if (!access_ok(VERIFY_WRITE, buf, len * sizeof(struct pinfo)))
+		return -EFAULT;
+
+	struct pinfo *pinfos = kmalloc(len * sizeof(struct pinfo), GFP_KERNEL);
+
+	// If the kernel cannot allocate memory, return -ENOMEM.
+	if (pinfos == NULL)
+		return -ENOMEM;
+
+	// Traverse the process family tree in pre-order from the root.
+	int i = 0;
+	read_lock(&tasklist_lock);
+
+	// Process root process.
+	pinfos[i].state = init_task.state;
+	pinfos[i].pid = init_task.pid;
+	pinfos[i].uid = init_task.cred->uid.val;
+	strncpy(pinfos[i].comm, init_task.comm, TASK_COMM_LEN);
+	i++;
+
+	// Traverse the process family tree in pre-order from the root.
+	struct task_struct *child;
+	struct list_head *list;
+	struct list_head stack;
+	INIT_LIST_HEAD(&stack);
+
+	list_add(&init_task.children, &stack);
+
+	while (!list_empty(&stack)) {
+		// Pop the top element from the stack.
+		list = stack.next;
+		list_del(list);
+		child = list_entry(list, struct task_struct, children);
+
+		// Fill the pinfo of the current process.
+		pinfos[i].state = child->state;
+		pinfos[i].pid = child->pid;
+		pinfos[i].uid = child->cred->uid.val;
+		strncpy(pinfos[i].comm, child->comm, TASK_COMM_LEN);
+
+		// If the buffer is full, break
+		if (++i == len)
+			break;
+
+		// Push the children of the current process to the stack.
+		list_for_each(list, &child->children)
+			list_add(list, &stack);
+	}
+	read_unlock(&tasklist_lock);
+
+	// Copy the pinfos to the user-space buffer.
+	if (copy_to_user(buf, pinfos, i * sizeof(struct pinfo))) {
+		kfree(pinfos);
+		return -EFAULT;
+	}
+
+	kfree(pinfos);
+	return i;
 }

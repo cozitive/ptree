@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <unistd.h>
 
 struct pinfo {
 	int64_t state; /* current state of the process */
