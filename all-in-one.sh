@@ -1,4 +1,10 @@
-./build-rpi3.sh
-./scripts/mkbootimg_rpi3.sh
+#/bin/bash
+
+BASEDIR=$(dirname "$0")
+cd $BASEDIR
+
+sudo ./build-rpi3.sh
+sudo ./scripts/mkbootimg_rpi3.sh
 cp modules.img boot.img ./tizen-image/
-./setup-images.sh
+sudo ./setup-images.sh
+./test_ptree/mount-and-copy.sh

@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 struct pinfo {
 	int64_t state; /* current state of the process */
 	pid_t pid; /* process id */

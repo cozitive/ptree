@@ -73,6 +73,8 @@
 
 #include "uid16.h"
 
+#include <linux/kernel.h>
+
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
 #endif
@@ -2639,3 +2641,10 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+
+SYSCALL_DEFINE2(ptree, struct pinfo *, buf, size_t, len)
+{
+	printk(KERN_INFO "Hello, world!");
+	return 255;
+}
