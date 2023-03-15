@@ -2646,59 +2646,78 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 /// @return number of pinfos in buf
 SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 {
-	// If buf is NULL or if len is 0, return -EINVAL.
+	// Struct representing task stack element.
+	struct stack_element {
+		struct task_struct *task;
+		struct list_head head;
+	};
+
+	struct pinfo *pinfos;		// An array for saving process info.
+	int i = 0;					// Index for pinfo array.
+	struct stack_element *init;	// Stack element pointer for the init process.
+	static LIST_HEAD(stack);	// List head of task stack.
+
+	// -EINVAL error handling.
 	if (buf == NULL || len == 0)
 		return -EINVAL;
 
-	// If buf is outside the accessible address space, return -EFAULT.
+	// -EFAULT error handling.
 	if (!access_ok(VERIFY_WRITE, buf, len * sizeof(struct pinfo)))
 		return -EFAULT;
 
-	struct pinfo *pinfos = kmalloc(len * sizeof(struct pinfo), GFP_KERNEL);
-
-	// If the kernel cannot allocate memory, return -ENOMEM.
+	// Allocate memory to pinfos.
+	pinfos = kmalloc(len * sizeof(struct pinfo), GFP_KERNEL);
 	if (pinfos == NULL)
 		return -ENOMEM;
 
 	// Traverse the process family tree in pre-order from the root.
-	int i = 0;
+	// Lock the task list.
 	read_lock(&tasklist_lock);
 
-	// Process root process.
-	pinfos[i].state = init_task.state;
-	pinfos[i].pid = init_task.pid;
-	pinfos[i].uid = init_task.cred->uid.val;
-	strncpy(pinfos[i].comm, init_task.comm, TASK_COMM_LEN);
-	i++;
+	// Push initial root process to stack.
+	init = kmalloc(sizeof(*init), GFP_KERNEL);
+	init->task = &init_task;
+	INIT_LIST_HEAD(&init->head);
+	list_add(&init->head, &stack);
 
-	// Traverse the process family tree in pre-order from the root.
-	struct task_struct *child;
-	struct list_head *list;
-	struct list_head stack;
-	INIT_LIST_HEAD(&stack);
-
-	list_add(&init_task.children, &stack);
-
+	// Implement pre-order via stack.
 	while (!list_empty(&stack)) {
-		// Pop the top element from the stack.
-		list = stack.next;
-		list_del(list);
-		child = list_entry(list, struct task_struct, children);
+		struct list_head *top_head;
+		struct stack_element *top_element;
+		struct task_struct *top_task;
+		struct list_head *child_head;
+		struct stack_element *child_element;
+		struct task_struct *child_task;
 
-		// Fill the pinfo of the current process.
-		pinfos[i].state = child->state;
-		pinfos[i].pid = child->pid;
-		pinfos[i].uid = child->cred->uid.val;
-		strncpy(pinfos[i].comm, child->comm, TASK_COMM_LEN);
+		// Save the top process info to the result array.
+		top_head = stack.next;
+		top_element = list_entry(top_head, struct stack_element, head);
+		top_task = top_element->task;
 
-		// If the buffer is full, break
+		pinfos[i].state = top_task->state;
+		pinfos[i].pid = top_task->pid;
+		pinfos[i].uid = top_task->cred->uid.val;
+		strncpy(pinfos[i].comm, top_task->comm, TASK_COMM_LEN);
+		// printk("[%d] %s, %d, %ld, %ld\n", i, pinfos[i].comm, pinfos[i].pid, pinfos[i].state, pinfos[i].uid);
+
+		// If the result array is full, terminate the loop.
 		if (++i == len)
 			break;
+		
+		// Push children processes of the top process to the stack.
+		list_for_each(child_head, &top_task->children) {
+			child_task = list_entry(child_head, struct task_struct, sibling);
+			child_element = kmalloc(sizeof(*child_element), GFP_KERNEL);
+			child_element->task = child_task;
+			INIT_LIST_HEAD(&child_element->head);
+			list_add(&child_element->head, &stack);
+		}
 
-		// Push the children of the current process to the stack.
-		list_for_each(list, &child->children)
-			list_add(list, &stack);
+		// Pop the top process.
+		list_del(top_head);
 	}
+
+	// Unlock the task list.
 	read_unlock(&tasklist_lock);
 
 	// Copy the pinfos to the user-space buffer.
@@ -2706,7 +2725,6 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		kfree(pinfos);
 		return -EFAULT;
 	}
-
 	kfree(pinfos);
 	return i;
 }
