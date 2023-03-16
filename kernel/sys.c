@@ -2703,9 +2703,9 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		// If the result array is full, terminate the loop.
 		if (++i == len)
 			break;
-		
+
 		// Push children processes of the top process to the stack.
-		list_for_each(child_head, &top_task->children) {
+		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
 			child_element = kmalloc(sizeof(*child_element), GFP_KERNEL);
 			child_element->task = child_task;
