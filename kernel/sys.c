@@ -2660,10 +2660,12 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	struct stack_element {
 		struct task_struct *task;
 		struct list_head head;
+		unsigned int depth;
 	};
 
 	struct pinfo *pinfos; // An array for saving process info.
 	int i = 0; // Index for pinfo array.
+	int d = 0;
 	struct stack_element *init; // Stack element pointer for the init process.
 	static LIST_HEAD(stack); // List head of task stack.
 
@@ -2686,6 +2688,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	// Push initial root process to stack.
 	init = kmalloc(sizeof(*init), GFP_KERNEL);
+	init->depth = 0;
 	init->task = &init_task;
 	INIT_LIST_HEAD(&init->head);
 	list_add(&init->head, &stack);
@@ -2707,6 +2710,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		pinfos[i].state = top_task->state;
 		pinfos[i].pid = top_task->pid;
 		pinfos[i].uid = top_task->cred->uid.val;
+		pinfos[i].depth = top_element->depth;
 		strncpy(pinfos[i].comm, top_task->comm, TASK_COMM_LEN);
 		// printk("[%d] %s, %d, %ld, %ld\n", i, pinfos[i].comm, pinfos[i].pid, pinfos[i].state, pinfos[i].uid);
 
@@ -2714,13 +2718,18 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		if (++i == len)
 			break;
 
+		d++;
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
 			child_element = kmalloc(sizeof(*child_element), GFP_KERNEL);
 			child_element->task = child_task;
+			child_element->depth = d;
 			INIT_LIST_HEAD(&child_element->head);
 			list_add(&child_element->head, &stack);
+		}
+		if(child_element != NULL && child_element->depth != d){
+			d=child_element->depth;
 		}
 
 		// Pop the top process.

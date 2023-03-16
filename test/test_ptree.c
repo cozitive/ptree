@@ -31,6 +31,9 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i < ret_len; i++) {
         struct pinfo p = buf[i];
+        for(int j = 0; j<p.depth; j++){
+            printf("    ");
+        }
         printf("[%d] %s, %d, %ld, %ld\n", i, p.comm, p.pid, p.state, p.uid);
     }
     return 0;
