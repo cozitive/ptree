@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <string.h>
 #include "test_ptree.h"
+#include <errno.h>
 #define SYS_PTREE 294
 
 int main(int argc, char *argv[]) {
@@ -26,7 +27,10 @@ int main(int argc, char *argv[]) {
     struct pinfo *buf = malloc(buf_len * sizeof(struct pinfo));
     int ret_len = syscall(SYS_PTREE, buf, buf_len);
     if (ret_len < 0) {
-        perror("syscall");
+        if (errno == EINVAL) printf("Error: ptree() returned -EINVAL\n");
+        else if (errno == EFAULT) printf("Error: ptree() returned -EFAULT\n");
+        else printf("Error: ptree() error\n");
+        free(buf);
         return 1;
     }
     for (int i = 0; i < ret_len; i++) {
@@ -36,5 +40,6 @@ int main(int argc, char *argv[]) {
         }
         printf("%s, %d, %ld, %ld\n", p.comm, p.pid, p.state, p.uid);
     }
+    free(buf);
     return 0;
 }
