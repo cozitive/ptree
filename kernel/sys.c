@@ -2724,7 +2724,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		}
 
 		// Pop the top process.
-        list_del(top_head);
+        list_del_init(top_head);
         list_add(top_head, &garbage); // Instead of freeing top_head right away, put it into garbage stack to prevent deadlock
 	}
 
