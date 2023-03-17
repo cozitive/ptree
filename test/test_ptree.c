@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         for(int j = 0; j<p.depth; j++){
             printf("    ");
         }
-        printf("[%d] %s, %d, %ld, %ld\n", i, p.comm, p.pid, p.state, p.uid);
+        printf("%s, %d, %ld, %ld\n", p.comm, p.pid, p.state, p.uid);
     }
     return 0;
 }
