@@ -2703,7 +2703,6 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		pinfos[i].uid = top_task->cred->uid.val;
 		pinfos[i].depth = top_element->depth;
 		strncpy(pinfos[i].comm, top_task->comm, TASK_COMM_LEN);
-		// printk("[%d] %s, %d, %ld, %ld\n", i, pinfos[i].comm, pinfos[i].pid, pinfos[i].state, pinfos[i].uid);
 
 		// If the result array is full, terminate the loop.
 		if (++i == len)
@@ -2725,13 +2724,15 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 		// Pop the top process.
         list_del_init(top_head);
-        list_add(top_head, &garbage); // Instead of freeing top_head right away, put it into garbage stack to prevent deadlock
+
+		// Instead of freeing top_head right away, put it into garbage stack to prevent deadlock.
+        list_add(top_head, &garbage);
 	}
 
 	// Unlock the task list.
 	read_unlock(&tasklist_lock);
 
-    // Free the memory of the elements in garbage
+    // Free the memory of the elements in garbage array.
     while (!list_empty(&garbage)) {
         struct list_head *temp_head = garbage.next;
         struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
