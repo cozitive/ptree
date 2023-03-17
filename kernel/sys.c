@@ -2678,7 +2678,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	read_lock(&tasklist_lock);
 
 	// Push initial root process to stack.
-	init = kmalloc(sizeof(*init), GFP_ATOMIC);
+	init = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
 	init->depth = 0;
 	init->task = &init_task;
 	INIT_LIST_HEAD(&init->head);
@@ -2716,7 +2716,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
-			child_element = kmalloc(sizeof(*child_element), GFP_ATOMIC);
+			child_element = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
 			child_element->task = child_task;
 			child_element->depth = depth;
 			INIT_LIST_HEAD(&child_element->head);
