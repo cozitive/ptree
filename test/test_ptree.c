@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     if (ret_len < 0) {
         if (errno == EINVAL) printf("Error: ptree() returned -EINVAL\n");
         else if (errno == EFAULT) printf("Error: ptree() returned -EFAULT\n");
-        else printf("Error: ptree() error\n");
+        else printf("Error: %s\n", strerror(errno));
         free(buf);
         return 1;
     }
