@@ -2708,7 +2708,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		if (++i == len)
 			break;
 
-		d++;
+		if(top_element->depth == d){d++;}
+        else if(top_element->depth < d){d=top_element->depth+1;}
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
@@ -2717,9 +2718,6 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 			child_element->depth = d;
 			INIT_LIST_HEAD(&child_element->head);
 			list_add(&child_element->head, &stack);
-		}
-		if(child_element != NULL && child_element->depth != d){
-			d=child_element->depth;
 		}
 
 		// Pop the top process.
