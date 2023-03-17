@@ -2723,7 +2723,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		}
 
 		// Pop the top process.
-		list_del(top_head);
+		kfree(top_element);
+        list_del(top_head);
 	}
 
 	// Unlock the task list.
