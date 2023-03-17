@@ -2658,6 +2658,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	int depth = 0;				// Current tree depth.
 	struct stack_element *init;	// Stack element pointer for the init process.
 	static LIST_HEAD(stack); 	// List head of task stack.
+	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
 
 	// -EINVAL error handling.
 	if (buf == NULL || len == 0)
@@ -2677,7 +2678,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	read_lock(&tasklist_lock);
 
 	// Push initial root process to stack.
-	init = kmalloc(sizeof(*init), GFP_KERNEL);
+	init = kmalloc(sizeof(*init), GFP_ATOMIC);
 	init->depth = 0;
 	init->task = &init_task;
 	INIT_LIST_HEAD(&init->head);
@@ -2715,7 +2716,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
-			child_element = kmalloc(sizeof(*child_element), GFP_KERNEL);
+			child_element = kmalloc(sizeof(*child_element), GFP_ATOMIC);
 			child_element->task = child_task;
 			child_element->depth = depth;
 			INIT_LIST_HEAD(&child_element->head);
@@ -2723,11 +2724,22 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		}
 
 		// Pop the top process.
-		list_del(top_head);
+        list_del_init(top_head);
+
+		// Instead of freeing top_head right away, put it into garbage stack to prevent deadlock.
+        list_add(top_head, &garbage);
 	}
 
 	// Unlock the task list.
 	read_unlock(&tasklist_lock);
+
+    // Free the memory of the elements in garbage array.
+    while (!list_empty(&garbage)) {
+        struct list_head *temp_head = garbage.next;
+        struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
+        list_del(temp_head);
+        kfree(temp_element);
+    }
 
 	// Copy the pinfos to the user-space buffer.
 	if (copy_to_user(buf, pinfos, index * sizeof(struct pinfo))) {
