@@ -2653,12 +2653,12 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		unsigned int depth;
 	};
 
-	struct pinfo *pinfos; // An array for saving process info.
-	int i = 0; // Index for pinfo array.
-	int d = 0;
-	struct stack_element *init; // Stack element pointer for the init process.
-	static LIST_HEAD(stack); // List head of task stack.
-    LIST_HEAD(garbage); // Garbage collection stack to prevent deadlock
+	struct pinfo *pinfos;		// An array for saving process info.
+	int index = 0; 				// Index for pinfo array.
+	int depth = 0;				// Current tree depth.
+	struct stack_element *init;	// Stack element pointer for the init process.
+	static LIST_HEAD(stack); 	// List head of task stack.
+	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
 
 	// -EINVAL error handling.
 	if (buf == NULL || len == 0)
@@ -2698,28 +2698,29 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		top_element = list_entry(top_head, struct stack_element, head);
 		top_task = top_element->task;
 
-		pinfos[i].state = top_task->state;
-		pinfos[i].pid = top_task->pid;
-		pinfos[i].uid = top_task->cred->uid.val;
-		pinfos[i].depth = top_element->depth;
-		strncpy(pinfos[i].comm, top_task->comm, TASK_COMM_LEN);
+		pinfos[index].state = top_task->state;
+		pinfos[index].pid = top_task->pid;
+		pinfos[index].uid = top_task->cred->uid.val;
+		pinfos[index].depth = top_element->depth;
+		strncpy(pinfos[index].comm, top_task->comm, TASK_COMM_LEN);
 
 		// If the result array is full, terminate the loop.
-		if (++i == len)
+		if (++index == len)
 			break;
 
-		d++;
+		if (top_element->depth == depth)
+			depth++;
+        else if (top_element->depth < depth)
+			depth = top_element->depth + 1;
+
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
 			child_element = kmalloc(sizeof(*child_element), GFP_ATOMIC);
 			child_element->task = child_task;
-			child_element->depth = d;
+			child_element->depth = depth;
 			INIT_LIST_HEAD(&child_element->head);
 			list_add(&child_element->head, &stack);
-		}
-		if(child_element != NULL && child_element->depth != d){
-			d=child_element->depth;
 		}
 
 		// Pop the top process.
@@ -2741,10 +2742,10 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
     }
 
 	// Copy the pinfos to the user-space buffer.
-	if (copy_to_user(buf, pinfos, i * sizeof(struct pinfo))) {
+	if (copy_to_user(buf, pinfos, index * sizeof(struct pinfo))) {
 		kfree(pinfos);
 		return -EFAULT;
 	}
 	kfree(pinfos);
-	return i;
+	return index;
 }
