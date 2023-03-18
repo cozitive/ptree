@@ -2738,7 +2738,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
         struct list_head *temp_head = garbage.next;
         struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
         list_del(temp_head);
-        kfree(temp_element);
+		if (temp_element != NULL) kfree(temp_element);
     }
 
 	// Copy the pinfos to the user-space buffer.
