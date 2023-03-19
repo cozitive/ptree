@@ -2655,23 +2655,25 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	struct pinfo *pinfos;		// An array for saving process info.
 	int index = 0; 				// Index for pinfo array.
-	int depth = 0;				// Current tree depth.
 	struct stack_element *init;	// Stack element pointer for the init process.
 	static LIST_HEAD(stack); 	// List head of task stack.
 	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
 
 	// -EINVAL error handling.
-	if (buf == NULL || len == 0)
+	if (buf == NULL || len == 0) {
 		return -EINVAL;
+	}
 
 	// -EFAULT error handling.
-	if (!access_ok(VERIFY_WRITE, buf, len * sizeof(struct pinfo)))
+	if (!access_ok(VERIFY_WRITE, buf, len * sizeof(struct pinfo))) {
 		return -EFAULT;
+	}
 
 	// Allocate memory to pinfos.
 	pinfos = kmalloc(len * sizeof(struct pinfo), GFP_KERNEL);
-	if (pinfos == NULL)
+	if (pinfos == NULL) {
 		return -ENOMEM;
+	}
 
 	// Traverse the process family tree in pre-order from the root.
 	// Lock the task list.
@@ -2705,20 +2707,16 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		strncpy(pinfos[index].comm, top_task->comm, TASK_COMM_LEN);
 
 		// If the result array is full, terminate the loop.
-		if (++index == len)
+		if (++index == len) {
 			break;
-
-		if (top_element->depth == depth)
-			depth++;
-        else if (top_element->depth < depth)
-			depth = top_element->depth + 1;
+		}
 
 		// Push children processes of the top process to the stack.
 		list_for_each_prev(child_head, &top_task->children) {
 			child_task = list_entry(child_head, struct task_struct, sibling);
 			child_element = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
 			child_element->task = child_task;
-			child_element->depth = depth;
+			child_element->depth = top_element->depth + 1;
 			INIT_LIST_HEAD(&child_element->head);
 			list_add(&child_element->head, &stack);
 		}
@@ -2738,7 +2736,9 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
         struct list_head *temp_head = garbage.next;
         struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
         list_del(temp_head);
-		if (temp_element != NULL) kfree(temp_element);
+		if (temp_element != NULL) {
+			kfree(temp_element);
+		}
     }
 
 	// Copy the pinfos to the user-space buffer.
