@@ -83,6 +83,7 @@ union bpf_attr;
 #include <linux/key.h>
 #include <linux/personality.h>
 #include <trace/syscall.h>
+#include <linux/pinfo.h>
 
 #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
 /*
@@ -330,6 +331,7 @@ asmlinkage long sys_fremovexattr(int fd, const char __user *name);
 
 /* fs/dcache.c */
 asmlinkage long sys_getcwd(char __user *buf, unsigned long size);
+
 
 /* fs/cookies.c */
 asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
@@ -1294,3 +1296,5 @@ static inline unsigned int ksys_personality(unsigned int personality)
 }
 
 #endif
+
+asmlinkage long sys_ptree(struct pinfo __user *buf, size_t len);

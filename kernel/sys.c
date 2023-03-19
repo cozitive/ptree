@@ -2639,3 +2639,113 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+/// @brief traverse the process familiy tree in pre-order from the root and return the information of the processes running on the system
+/// @param[out] buf user-space buffer for pinfos
+/// @param[in] len length of the buffer, i.e., the number of the allocated pinfo entries in the buffer
+/// @return number of pinfos in buf
+SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
+{
+	// Struct representing task stack element.
+	struct stack_element {
+		struct task_struct *task;
+		struct list_head head;
+		unsigned int depth;
+	};
+
+	struct pinfo *pinfos;		// An array for saving process info.
+	int index = 0; 				// Index for pinfo array.
+	struct stack_element *init;	// Stack element pointer for the init process.
+	static LIST_HEAD(stack); 	// List head of task stack.
+	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
+
+	// -EINVAL error handling.
+	if (buf == NULL || len == 0) {
+		return -EINVAL;
+	}
+
+	// -EFAULT error handling.
+	if (!access_ok(VERIFY_WRITE, buf, len * sizeof(struct pinfo))) {
+		return -EFAULT;
+	}
+
+	// Allocate memory to pinfos.
+	pinfos = kmalloc(len * sizeof(struct pinfo), GFP_KERNEL);
+	if (pinfos == NULL) {
+		return -ENOMEM;
+	}
+
+	// Traverse the process family tree in pre-order from the root.
+	// Lock the task list.
+	read_lock(&tasklist_lock);
+
+	// Push initial root process to stack.
+	init = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
+	init->depth = 0;
+	init->task = &init_task;
+	INIT_LIST_HEAD(&init->head);
+	list_add(&init->head, &stack);
+
+	// Implement pre-order via stack.
+	while (!list_empty(&stack)) {
+		struct list_head *top_head;
+		struct stack_element *top_element;
+		struct task_struct *top_task;
+		struct list_head *child_head;
+		struct stack_element *child_element;
+		struct task_struct *child_task;
+
+		// Save the top process info to the result array.
+		top_head = stack.next;
+		top_element = list_entry(top_head, struct stack_element, head);
+		top_task = top_element->task;
+
+		pinfos[index].state = top_task->state;
+		pinfos[index].pid = top_task->pid;
+		pinfos[index].uid = top_task->cred->uid.val;
+		pinfos[index].depth = top_element->depth;
+		strncpy(pinfos[index].comm, top_task->comm, TASK_COMM_LEN);
+
+		// If the result array is full, terminate the loop.
+		if (++index == len) {
+			break;
+		}
+
+		// Push children processes of the top process to the stack.
+		list_for_each_prev(child_head, &top_task->children) {
+			child_task = list_entry(child_head, struct task_struct, sibling);
+			child_element = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
+			child_element->task = child_task;
+			child_element->depth = top_element->depth + 1;
+			INIT_LIST_HEAD(&child_element->head);
+			list_add(&child_element->head, &stack);
+		}
+
+		// Pop the top process.
+        list_del_init(top_head);
+
+		// Instead of freeing top_head right away, put it into garbage stack to prevent deadlock.
+        list_add(top_head, &garbage);
+	}
+
+	// Unlock the task list.
+	read_unlock(&tasklist_lock);
+
+    // Free the memory of the elements in garbage array.
+    while (!list_empty(&garbage)) {
+        struct list_head *temp_head = garbage.next;
+        struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
+        list_del(temp_head);
+		if (temp_element != NULL) {
+			kfree(temp_element);
+		}
+    }
+
+	// Copy the pinfos to the user-space buffer.
+	if (copy_to_user(buf, pinfos, index * sizeof(struct pinfo))) {
+		kfree(pinfos);
+		return -EFAULT;
+	}
+	kfree(pinfos);
+	return index;
+}
