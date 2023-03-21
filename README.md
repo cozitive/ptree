@@ -33,6 +33,9 @@ If there was no error, `ptree` returns the number of `struct pinfo`s that were o
 
 ## Implementation
 To implement the pre-order traverse, `ptree` used a stack instead of recursive function call. The built-in linked list in kernel is used as a stack.
+```c
+static LIST_HEAD(stack);
+```
 
 A Stack element contains each task information and a pointer to list head:
 ```c
@@ -86,14 +89,26 @@ list_for_each_prev(child_head, &top_task->children) {
 
 3. the top stack element is popped.
 ```c
-list_del_init(top_head);
+list_del(top_head);
 ```
 
-`ptree` syscall iterates these operations while the stack become empty.
+`ptree` syscall iterates these operations while the stack become empty, or the result buffer become full.
 
 After the termination of the loop, `tasklist_lock` is unlocked.
 ```c
 read_unlock(&tasklist_lock);
+```
+
+If the loop is terminated due to insufficient buffer size, the stack may be not empty. In this case, the stack should be emptied, and all stack elements should be freed.
+```c
+while (!list_empty(&stack)) {
+    struct list_head *node = stack.next;
+    struct stack_element *element = list_entry(node, struct stack_element, head);
+    list_del(node);
+    if (element != NULL) {
+        kfree(element);
+    }
+}
 ```
 
 Lastly, `pinfos` should be copied to a user space buffer `buf`, and be freed.
@@ -114,20 +129,20 @@ static LIST_HEAD(garbage);
 
 read_lock(&tasklist_lock);
 
-while () {
+while (!list_empty(&stack)) {
     ...
-    list_del_init(top_head);
+    list_del(top_head);
     list_add(top_head, &garbage);
 }
 
 read_unlock(&tasklist_lock);
 
 while (!list_empty(&garbage)) {
-    struct list_head *temp_head = garbage.next;
-    struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
-    list_del(temp_head);
-    if (temp_element != NULL) {
-        kfree(temp_element);
+    struct list_head *node = garbage.next;
+    struct stack_element *element = list_entry(node, struct stack_element, head);
+    list_del(node);
+    if (element != NULL) {
+        kfree(element);
     }
 }
 ```

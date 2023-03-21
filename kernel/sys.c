@@ -2722,24 +2722,34 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		}
 
 		// Pop the top process.
-        list_del_init(top_head);
+		list_del(top_head);
 
 		// Instead of freeing top_head right away, put it into garbage stack to prevent deadlock.
-        list_add(top_head, &garbage);
+		list_add(top_head, &garbage);
 	}
 
 	// Unlock the task list.
 	read_unlock(&tasklist_lock);
 
-    // Free the memory of the elements in garbage array.
-    while (!list_empty(&garbage)) {
-        struct list_head *temp_head = garbage.next;
-        struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
-        list_del(temp_head);
-		if (temp_element != NULL) {
-			kfree(temp_element);
+	// Clear the stack.
+	while (!list_empty(&stack)) {
+		struct list_head *node = stack.next;
+		struct stack_element *element = list_entry(node, struct stack_element, head);
+		list_del(node);
+		if (element != NULL) {
+			kfree(element);
 		}
-    }
+	}
+
+	// Free the memory of the elements in garbage array.
+	while (!list_empty(&garbage)) {
+		struct list_head *node = garbage.next;
+		struct stack_element *element = list_entry(node, struct stack_element, head);
+		list_del(node);
+		if (element != NULL) {
+			kfree(element);
+		}
+	}
 
 	// Copy the pinfos to the user-space buffer.
 	if (copy_to_user(buf, pinfos, index * sizeof(struct pinfo))) {

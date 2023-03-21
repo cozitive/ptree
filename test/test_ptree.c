@@ -29,12 +29,13 @@ int main(int argc, char *argv[]) {
 
     // Handle error in ptree syscall.
     if (ret_len < 0) {
-        if (errno == EINVAL)
+        if (errno == EINVAL) {
             printf("Error: ptree() returned -EINVAL\n");
-        else if (errno == EFAULT)
+        } else if (errno == EFAULT) {
             printf("Error: ptree() returned -EFAULT\n");
-        else
+        } else {
             printf("Error: %s\n", strerror(errno));
+        }
         free(buf);
         return 1;
     }
