@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
         }
         printf("%s, %d, %ld, %ld\n", p.comm, p.pid, p.state, p.uid);
     }
-    printf("ret_len: %d\n", ret_len);
 
     // Free allocated memory.
     free(buf);
