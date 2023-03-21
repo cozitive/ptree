@@ -2656,8 +2656,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	struct pinfo *pinfos;		// An array for saving process info.
 	int index = 0; 				// Index for pinfo array.
 	struct stack_element *init;	// Stack element pointer for the init process.
-	static LIST_HEAD(stack); 	// List head of task stack.
-	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
+	LIST_HEAD(stack); 			// List head of task stack.
+	LIST_HEAD(garbage);			// Garbage collection stack to prevent deadlock.
 
 	// -EINVAL error handling.
 	if (buf == NULL || len == 0) {
@@ -2722,7 +2722,7 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 		}
 
 		// Pop the top process.
-        list_del_init(top_head);
+        list_del(top_head);
 
 		// Instead of freeing top_head right away, put it into garbage stack to prevent deadlock.
         list_add(top_head, &garbage);
@@ -2731,13 +2731,23 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	// Unlock the task list.
 	read_unlock(&tasklist_lock);
 
+	// Clear the stack.
+	while (!list_empty(&stack)) {
+		struct list_head *node = stack.next;
+		struct stack_element *element = list_entry(node, struct stack_element, head);
+		list_del(node);
+		if (element != NULL) {
+			kfree(element);
+		}
+	}
+
     // Free the memory of the elements in garbage array.
     while (!list_empty(&garbage)) {
-        struct list_head *temp_head = garbage.next;
-        struct stack_element *temp_element = list_entry(temp_head, struct stack_element, head);
-        list_del(temp_head);
-		if (temp_element != NULL) {
-			kfree(temp_element);
+        struct list_head *node = garbage.next;
+        struct stack_element *element = list_entry(node, struct stack_element, head);
+        list_del(node);
+		if (element != NULL) {
+			kfree(element);
 		}
     }
 
