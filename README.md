@@ -34,7 +34,7 @@ If there was no error, `ptree` returns the number of `struct pinfo`s that were o
 ## Implementation
 To implement the pre-order traverse, `ptree` used a stack instead of recursive function call. The built-in linked list in kernel is used as a stack.
 ```c
-LIST_HEAD(stack);
+static LIST_HEAD(stack);
 ```
 
 A Stack element contains each task information and a pointer to list head:
@@ -125,7 +125,7 @@ child_element = kmalloc(sizeof(struct stack_element), GFP_ATOMIC);
 
 To call `kfree()` after releasing the lock, pointers to the popped stack elements are stored in a list called `garbage`, and be freed at once.
 ```c
-LIST_HEAD(garbage);
+static LIST_HEAD(garbage);
 
 read_lock(&tasklist_lock);
 

@@ -2656,8 +2656,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 	struct pinfo *pinfos;		// An array for saving process info.
 	int index = 0; 				// Index for pinfo array.
 	struct stack_element *init;	// Stack element pointer for the init process.
-	LIST_HEAD(stack); 			// List head of task stack.
-	LIST_HEAD(garbage);			// Garbage collection stack to prevent deadlock.
+	static LIST_HEAD(stack); 	// List head of task stack.
+	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
 
 	// -EINVAL error handling.
 	if (buf == NULL || len == 0) {
