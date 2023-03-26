@@ -147,7 +147,7 @@ while (!list_empty(&garbage)) {
 }
 ```
 
-## Using `ptree` in user-space
+## Using `ptree` in user space
 
 The syscall number is registered as `294` in the kernel code, so you can call it using the `syscall()` C function.
 
@@ -170,6 +170,8 @@ $ make
 ```
 
 The default compiler is configured as`aarch64-linux-gnu-gcc` in the Makefile, so make sure that the compiler is properly installed. Also, make sure to run the compiled executable in the appropriate architecture. We have tested only in Tizen OS.
+
+To run the compiled binary, you should put buffer size as the second command-line argument(`argv[1]`).
 
 Example:
 
