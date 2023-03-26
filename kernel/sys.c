@@ -2655,9 +2655,20 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	struct pinfo *pinfos;		// An array for saving process info.
 	int index = 0; 				// Index for pinfo array.
-	struct stack_element *init;	// Stack element pointer for the init process.
+
 	static LIST_HEAD(stack); 	// List head of task stack.
 	static LIST_HEAD(garbage);	// Garbage collection stack to prevent deadlock.
+	struct stack_element *init;	// Stack element pointer for the init process.
+
+	struct list_head *top_head;
+	struct stack_element *top_element;
+	struct task_struct *top_task;
+	struct list_head *child_head;
+	struct stack_element *child_element;
+	struct task_struct *child_task;
+
+	struct list_head *node;
+	struct stack_element *element;
 
 	// -EINVAL error handling.
 	if (buf == NULL || len == 0) {
@@ -2688,13 +2699,6 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	// Implement pre-order via stack.
 	while (!list_empty(&stack)) {
-		struct list_head *top_head;
-		struct stack_element *top_element;
-		struct task_struct *top_task;
-		struct list_head *child_head;
-		struct stack_element *child_element;
-		struct task_struct *child_task;
-
 		// Save the top process info to the result array.
 		top_head = stack.next;
 		top_element = list_entry(top_head, struct stack_element, head);
@@ -2733,8 +2737,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	// Clear the stack.
 	while (!list_empty(&stack)) {
-		struct list_head *node = stack.next;
-		struct stack_element *element = list_entry(node, struct stack_element, head);
+		node = stack.next;
+		element = list_entry(node, struct stack_element, head);
 		list_del(node);
 		if (element != NULL) {
 			kfree(element);
@@ -2743,8 +2747,8 @@ SYSCALL_DEFINE2(ptree, struct pinfo __user *, buf, size_t, len)
 
 	// Free the memory of the elements in garbage array.
 	while (!list_empty(&garbage)) {
-		struct list_head *node = garbage.next;
-		struct stack_element *element = list_entry(node, struct stack_element, head);
+		node = garbage.next;
+		element = list_entry(node, struct stack_element, head);
 		list_del(node);
 		if (element != NULL) {
 			kfree(element);
